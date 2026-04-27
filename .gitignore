@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+apps/**/node_modules/
+
+# Build outputs
+dist/
+apps/**/dist/
+coverage/
+
+# Logs
+*.log
+*.out
+*.err
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+apps/**/.env
+apps/**/.env.*
+!apps/**/.env.example
+!apps/**/.env.production.example
+*.pem
+*.key
+*.crt
+
+# PocketBase local data and binaries
+apps/pocketbase/pb_data/
+apps/pocketbase/pb_public/
+apps/pocketbase/pb_backup*/
+apps/pocketbase/pocketbase
+apps/pocketbase/pocketbase.exe
+apps/pocketbase/pocketbase_*_*.zip
+
+# IDE and OS junk
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+.claude/
