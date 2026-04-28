@@ -1,77 +1,64 @@
-# بنها بتقول إيه؟ — Web app
+# Benha Survey Web App
 
-React + Vite + Tailwind frontend for the Benha citizen-feedback survey, backed
-by a local PocketBase instance.
+React + Vite + Tailwind frontend for the public survey and admin dashboard.
 
-## Run locally
+Production data/auth now run on **Supabase**.
+PocketBase files remain in the monorepo only as a legacy local backup path.
 
-### 1) PocketBase backend
-```bash
-cd apps/pocketbase
-# First run only — seed credentials through env vars (use strong values):
-#   bash:
-#     PB_SUPERUSER_EMAIL=<email> PB_SUPERUSER_PASSWORD=<strong-pass> \
-#     PB_ADMIN_EMAIL=<email> PB_ADMIN_PASSWORD=<strong-pass> npm run dev
-#   PowerShell:
-#     $env:PB_SUPERUSER_EMAIL='<email>'; $env:PB_SUPERUSER_PASSWORD='<strong-pass>';
-#     $env:PB_ADMIN_EMAIL='<email>'; $env:PB_ADMIN_PASSWORD='<strong-pass>'; npm run dev
-# Subsequent runs (data already exists):
-npm run dev   # serves http://127.0.0.1:8090
-```
+## Environment
 
-The `npm run dev` script auto-selects `pocketbase.exe` on Windows and `./pocketbase`
-on macOS/Linux.
+Copy env template and set values:
 
-### 2) Web app
 ```bash
 cd apps/web
-cp .env.example .env   # default VITE_POCKETBASE_URL=http://127.0.0.1:8090
-npm install
-npm run dev            # http://localhost:3000
+cp .env.example .env
 ```
 
-Build / lint:
+Required:
+
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
+
+Optional legacy local fallback only:
+
+- `VITE_POCKETBASE_URL`
+
+## Local run
+
 ```bash
-npm run build
-npm run lint
+cd apps/web
+npm install
+npm run dev
 ```
 
-From the monorepo root, `npm install` then `npm run dev` runs both concurrently.
+Default app URL: `http://localhost:3000`
 
-## Where submissions live
+## Build / lint
 
-1. **Primary:** PocketBase `surveys` collection at `${VITE_POCKETBASE_URL}/api/collections/surveys`.
-   - Flat columns: `name`, `email`, `phone` (mirrored from reporter for easy filtering).
-   - JSON column `answers` holds the structured payload:
-     ```jsonc
-     {
-       "reporter":  { "fullName", "phone", "ageGroup", "optionalContact" },
-       "answers":   { "q1": "...", "q2": "...", "...": "..." },   // up to q20
-       "metadata":  { "submittedAt", "userAgent", "source": "web" }
-     }
-     ```
-2. **Fallback:** if PocketBase is unreachable, submissions are queued in
-   `localStorage.benha_pending_submissions` and auto-flushed on the next page
-   load that succeeds in reaching the backend.
+```bash
+npm run lint
+npm run build
+```
 
-## Admin
+## Data model (Supabase)
 
-- `/admin/login` — auth against the `admin_users` collection.
-- Bootstrap admin seed uses `PB_ADMIN_EMAIL` / `PB_ADMIN_PASSWORD` when provided.
-- For production, always use strong non-default credentials and rotate them.
-- `/admin` — overview, results table (search by name or phone, view dialog
-  with all 20 answers), analytics, export (CSV / JSON / PDF), settings.
+- `public.surveys` for survey submissions
+- `public.app_settings` for title/subtitle + survey open/closed state
+- `public.admin_profiles` linked to `auth.users`
+- `public.analytics_events` for page/form analytics
+
+## Admin capabilities
+
+- `/admin/login` uses Supabase Auth (email/password)
+- admin list/add/delete uses `admin_profiles`
+- self email/password updates use Supabase Auth + profile sync
 
 ## Hero image
 
-Placed at `apps/web/public/benha-hero.jpg`. Replace with any aspect-ratio
-photo — the hero card is `4:5` and uses `object-cover`, so the image is
-centered and cropped to fit. Keep filename as `benha-hero.jpg` or update the
-`<img src>` in `src/components/sections/HeroSection.jsx`.
+Image path:
 
-## Still needs real backend setup later
+`apps/web/public/benha-hero.jpg`
 
-- Server-side IP capture (currently a placeholder string).
-- Average completion-time metric (no timing fields persisted yet — UI shows `—`).
-- Email notifications on submit.
-- Production PocketBase deployment + credential rotation policy.
+If replaced, keep the filename or update:
+
+`apps/web/src/components/sections/HeroSection.jsx`

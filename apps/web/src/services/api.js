@@ -1,19 +1,14 @@
-import pb from '@/utils/pocketbase';
+import supabase, { getSupabaseErrorMessage, isSupabaseUnavailable } from '@/services/supabase';
 import { PENDING_STORAGE_KEY, SURVEY_QUESTIONS } from '@/utils/constants.js';
 
-/**
- * Survey submission shape:
- * {
- *   reporter:  { fullName, phone, ageGroup, optionalContact },
- *   answers:   { q1, q2, ... q20 },
- *   metadata:  { submittedAt, userAgent, source }
- * }
- *
- * The PocketBase `surveys` collection has flat name/email/phone columns plus
- * a JSON `answers` field — we mirror reporter into the flat columns so the
- * existing admin filters keep working, and we store the full structured
- * payload inside `answers` for richness.
- */
+const SURVEYS_TABLE = 'surveys';
+
+const adaptSurveyRow = (row) => ({
+  ...row,
+  created: row?.created_at || row?.created || null,
+  ipAddress: row?.ip_address || row?.ipAddress || null,
+  userAgent: row?.user_agent || row?.userAgent || null,
+});
 
 const buildPayload = (submission) => {
   const reporter = submission.reporter || {};
@@ -26,24 +21,10 @@ const buildPayload = (submission) => {
       answers: submission.answers || {},
       metadata: submission.metadata || {},
     },
-    ipAddress: 'client-ip',
-    userAgent: navigator.userAgent,
+    ip_address: 'client-ip',
+    user_agent: navigator.userAgent,
     timestamp: new Date().toISOString(),
   };
-};
-
-const isNetworkError = (err) => {
-  if (!err) return false;
-  if (err.isAbort) return false;
-  // PocketBase wraps fetch errors; the ClientResponseError has status 0 when
-  // the network call never reached the server.
-  if (err.status === 0) return true;
-  const msg = (err.message || '').toLowerCase();
-  return (
-    msg.includes('failed to fetch') ||
-    msg.includes('networkerror') ||
-    msg.includes('load failed')
-  );
 };
 
 const queueLocally = (payload) => {
@@ -54,23 +35,36 @@ const queueLocally = (payload) => {
     localStorage.setItem(PENDING_STORAGE_KEY, JSON.stringify(list));
     return true;
   } catch (err) {
+    // eslint-disable-next-line no-console
     console.warn('Could not queue submission locally:', err);
     return false;
   }
 };
 
+const extractSearchTerm = (filters = '') => {
+  const match = String(filters).match(/"(.*?)"/);
+  return match?.[1]?.trim() || '';
+};
+
 export const submitSurvey = async (submission) => {
   const payload = buildPayload(submission);
   try {
-    const record = await pb.collection('surveys').create(payload, { $autoCancel: false });
-    return { ok: true, record, queued: false };
+    const { data, error } = await supabase
+      .from(SURVEYS_TABLE)
+      .insert(payload)
+      .select('*')
+      .single();
+
+    if (error) throw error;
+    return { ok: true, record: adaptSurveyRow(data), queued: false };
   } catch (error) {
-    if (isNetworkError(error)) {
+    if (isSupabaseUnavailable(error)) {
       const queued = queueLocally(payload);
       if (queued) return { ok: true, record: null, queued: true };
     }
+    // eslint-disable-next-line no-console
     console.error('Failed to submit survey:', error);
-    throw new Error(error?.message || 'Failed to submit survey');
+    throw new Error(getSupabaseErrorMessage(error, 'Failed to submit survey'));
   }
 };
 
@@ -99,16 +93,15 @@ export const flushPendingSubmissions = async () => {
   const remaining = [];
   let sent = 0;
   for (const item of list) {
-    try {
-      await pb.collection('surveys').create(item.payload, { $autoCancel: false });
+    const { error } = await supabase.from(SURVEYS_TABLE).insert(item.payload);
+    if (!error) {
       sent += 1;
-    } catch (err) {
-      if (isNetworkError(err)) {
-        remaining.push(item);
-      }
-      // For non-network errors (e.g. validation), drop the item — keeping it
-      // would just retry forever.
+      continue;
     }
+    if (isSupabaseUnavailable(error)) {
+      remaining.push(item);
+    }
+    // Validation / policy issues are dropped intentionally to avoid infinite retries.
   }
 
   if (remaining.length === 0) {
@@ -120,23 +113,46 @@ export const flushPendingSubmissions = async () => {
 };
 
 export const getSurveyResults = async (page = 1, perPage = 50, filters = '') => {
-  const resultList = await pb.collection('surveys').getList(page, perPage, {
-    filter: filters,
-    sort: '-created',
-    $autoCancel: false,
-  });
-  return resultList;
+  const from = Math.max(0, (page - 1) * perPage);
+  const to = from + perPage - 1;
+  let query = supabase
+    .from(SURVEYS_TABLE)
+    .select('*', { count: 'exact' })
+    .order('created_at', { ascending: false })
+    .range(from, to);
+
+  const searchTerm = extractSearchTerm(filters);
+  if (searchTerm) {
+    const escaped = searchTerm.replace(/,/g, '');
+    query = query.or(`name.ilike.%${escaped}%,phone.ilike.%${escaped}%`);
+  }
+
+  const { data, error, count } = await query;
+  if (error) throw new Error(getSupabaseErrorMessage(error, 'Failed to fetch survey results'));
+
+  const totalItems = count || 0;
+  const totalPages = Math.ceil(totalItems / perPage);
+  return {
+    items: (data || []).map(adaptSurveyRow),
+    page,
+    perPage,
+    totalItems,
+    totalPages,
+  };
 };
 
 export const getSurveyStats = async () => {
   try {
-    const results = await pb.collection('surveys').getList(1, 1000, {
-      fields: 'id,created,answers',
-      $autoCancel: false,
-    });
-    const total = results.totalItems;
+    const { data, error, count } = await supabase
+      .from(SURVEYS_TABLE)
+      .select('id,answers', { count: 'exact' })
+      .limit(1000);
+
+    if (error) throw error;
+
+    const total = count || 0;
     const requiredIds = SURVEY_QUESTIONS.filter((q) => q.required).map((q) => q.id);
-    const completed = (results.items || []).filter((r) => {
+    const completed = (data || []).filter((r) => {
       const a = r?.answers?.answers || {};
       return requiredIds.every((id) => {
         const v = a[id];
@@ -144,18 +160,21 @@ export const getSurveyStats = async () => {
         return v !== undefined && v !== '' && v !== null;
       });
     }).length;
+
     return {
       total,
       completionRate: total > 0 ? ((completed / total) * 100).toFixed(1) : '0.0',
-      avgTime: null, // not tracked yet
+      avgTime: null,
     };
   } catch (error) {
+    // eslint-disable-next-line no-console
     console.error('Failed to fetch survey stats:', error);
     return { total: 0, completionRate: '0.0', avgTime: null };
   }
 };
 
 export const deleteSurvey = async (id) => {
-  await pb.collection('surveys').delete(id, { $autoCancel: false });
+  const { error } = await supabase.from(SURVEYS_TABLE).delete().eq('id', id);
+  if (error) throw new Error(getSupabaseErrorMessage(error, 'Failed to delete survey'));
   return true;
 };

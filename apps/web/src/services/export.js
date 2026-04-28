@@ -1,7 +1,7 @@
 import { SURVEY_QUESTIONS, AGE_GROUPS } from '@/utils/constants.js';
 
 /**
- * Records arrive from PocketBase shaped like:
+ * Records are normalized to:
  *   { id, created, name, email, phone, answers: { reporter, answers, metadata } }
  *
  * Older/legacy rows may have answers as a flat object — `flattenRecord` handles

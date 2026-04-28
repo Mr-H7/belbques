@@ -1,17 +1,17 @@
-import pb from '@/utils/pocketbase';
-
-/**
- * Settings live in PocketBase collection `app_settings` as singleton key/value
- * rows. Public read so the home page can hydrate title + open/closed state
- * without needing auth. Writes require an admin_users session.
- *
- * Local fallback: `localStorage.benha_settings_<key>` keeps the last known
- * value so the public page still renders something usable when PB is down.
- */
+import supabase, {
+  createStatelessSupabaseClient,
+  getSupabaseErrorMessage,
+  isSupabaseUnavailable,
+} from '@/services/supabase';
 
 const KEYS = {
   GENERAL: 'general',
   SURVEY_STATE: 'survey_state',
+};
+
+const TABLES = {
+  APP_SETTINGS: 'app_settings',
+  ADMIN_PROFILES: 'admin_profiles',
 };
 
 const DEFAULTS = {
@@ -37,55 +37,35 @@ const readLocal = (key) => {
 };
 
 const writeLocal = (key, value) => {
-  try { localStorage.setItem(lsKey(key), JSON.stringify(value)); } catch {}
-};
-
-const isPocketBaseUnavailable = (err) => {
-  if (!err) return false;
-  if (err.status === 0) return true;
-  const msg = String(err.message || '').toLowerCase();
-  return msg.includes('failed to fetch') || msg.includes('networkerror') || msg.includes('load failed');
-};
-
-const firstFieldError = (data) => {
-  if (!data || typeof data !== 'object') return '';
-  for (const value of Object.values(data)) {
-    if (value?.message) return value.message;
-  }
-  return '';
-};
-
-const getPbErrorMessage = (err, fallbackMessage) => {
-  const message =
-    firstFieldError(err?.response?.data) ||
-    firstFieldError(err?.data?.data) ||
-    err?.response?.message ||
-    err?.data?.message ||
-    err?.message;
-
-  if (!message || typeof message !== 'string') return fallbackMessage;
-  return message;
+  try {
+    localStorage.setItem(lsKey(key), JSON.stringify(value));
+  } catch {}
 };
 
 const logAdminError = (action, err) => {
-  console.error(`[settings] ${action} failed`, {
-    status: err?.status,
-    message: err?.message,
-    response: err?.response,
-    data: err?.data,
-    url: err?.url,
-  });
+  // eslint-disable-next-line no-console
+  console.error(`[settings] ${action} failed`, err);
 };
 
 const fetchOne = async (key) => {
   try {
-    const rec = await pb.collection('app_settings').getFirstListItem(`key="${key}"`, { $autoCancel: false });
-    if (rec?.value) writeLocal(key, rec.value);
-    return { record: rec, value: rec?.value || DEFAULTS[key] };
-  } catch (err) {
-    if (err?.status === 404) return { record: null, value: readLocal(key) || DEFAULTS[key] };
-    // Network or other error → fall back to local.
+    const { data, error } = await supabase
+      .from(TABLES.APP_SETTINGS)
+      .select('key,value')
+      .eq('key', key)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (data?.value) {
+      writeLocal(key, data.value);
+      return { record: data, value: data.value };
+    }
     return { record: null, value: readLocal(key) || DEFAULTS[key] };
+  } catch (err) {
+    if (isSupabaseUnavailable(err)) {
+      return { record: null, value: readLocal(key) || DEFAULTS[key] };
+    }
+    throw err;
   }
 };
 
@@ -93,80 +73,171 @@ export const getGeneral = async () => (await fetchOne(KEYS.GENERAL)).value;
 export const getSurveyState = async () => (await fetchOne(KEYS.SURVEY_STATE)).value;
 
 const upsert = async (key, value) => {
-  // Mirror locally first so UI stays responsive even if PB write fails.
   writeLocal(key, value);
-  try {
-    const existing = await pb.collection('app_settings').getFirstListItem(`key="${key}"`, { $autoCancel: false }).catch(() => null);
-    if (existing) {
-      await pb.collection('app_settings').update(existing.id, { value }, { $autoCancel: false });
-    } else {
-      await pb.collection('app_settings').create({ key, value }, { $autoCancel: false });
-    }
-    return { ok: true, persisted: true };
-  } catch (err) {
-    if (isPocketBaseUnavailable(err)) {
-      return { ok: true, persisted: false, error: err };
-    }
-    return { ok: false, persisted: false, error: err };
-  }
+  const { error } = await supabase
+    .from(TABLES.APP_SETTINGS)
+    .upsert({ key, value }, { onConflict: 'key' });
+
+  if (!error) return { ok: true, persisted: true };
+  if (isSupabaseUnavailable(error)) return { ok: true, persisted: false, error };
+  return { ok: false, persisted: false, error };
 };
 
 export const saveGeneral = (value) => upsert(KEYS.GENERAL, value);
 export const saveSurveyState = (value) => upsert(KEYS.SURVEY_STATE, value);
 
-// ───────────── admin user management ─────────────
+export const getCurrentAdminProfile = async (userId) => {
+  if (!userId) return null;
+  const { data, error } = await supabase
+    .from(TABLES.ADMIN_PROFILES)
+    .select('id,email,role,is_active,created_at')
+    .eq('id', userId)
+    .maybeSingle();
+
+  if (error) throw new Error(getSupabaseErrorMessage(error, 'فشل تحميل بيانات المدير'));
+  if (!data || data.is_active === false) return null;
+  return {
+    id: data.id,
+    email: data.email,
+    role: data.role || 'viewer',
+    created: data.created_at,
+  };
+};
 
 export const listAdmins = async () => {
   try {
-    const data = await pb.collection('admin_users').getList(1, 100, { $autoCancel: false });
-    const items = data?.items || [];
-    return [...items].sort((a, b) => {
-      const aDate = Date.parse(a?.createdAt || a?.created || '') || 0;
-      const bDate = Date.parse(b?.createdAt || b?.created || '') || 0;
-      if (aDate !== bDate) return bDate - aDate;
-      return String(a?.email || '').localeCompare(String(b?.email || ''));
-    });
+    const { data, error } = await supabase
+      .from(TABLES.ADMIN_PROFILES)
+      .select('id,email,role,created_at,is_active')
+      .eq('is_active', true)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return (data || []).map((row) => ({
+      id: row.id,
+      email: row.email,
+      role: row.role || 'viewer',
+      created: row.created_at,
+    }));
   } catch (err) {
     logAdminError('listAdmins', err);
-    throw new Error(getPbErrorMessage(err, 'فشل تحميل قائمة المدراء'));
+    throw new Error(getSupabaseErrorMessage(err, 'فشل تحميل قائمة المدراء'));
   }
 };
 
 export const createAdmin = async ({ email, password, role = 'admin' }) => {
-  const payload = { email, password, passwordConfirm: password, role, emailVisibility: true };
   try {
-    return await pb.collection('admin_users').create(payload, { $autoCancel: false });
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+    if (!normalizedEmail) throw new Error('البريد الإلكتروني مطلوب');
+
+    const { data: rpcData, error: rpcError } = await supabase.rpc('create_admin_user', {
+      p_email: normalizedEmail,
+      p_password: password,
+      p_role: role,
+    });
+    if (!rpcError) return rpcData;
+    logAdminError('createAdminRpcFallback', rpcError);
+
+    const { data: existingProfile, error: existingProfileError } = await supabase
+      .from(TABLES.ADMIN_PROFILES)
+      .select('id,is_active')
+      .eq('email', normalizedEmail)
+      .maybeSingle();
+    if (existingProfileError) throw existingProfileError;
+    if (existingProfile?.is_active) throw new Error('هذا البريد مسجل بالفعل كمدير');
+
+    const signupClient = createStatelessSupabaseClient();
+    const { data: signupData, error: signupError } = await signupClient.auth.signUp({
+      email: normalizedEmail,
+      password,
+    });
+    if (signupError) throw signupError;
+
+    const newUserId = signupData?.user?.id;
+    if (!newUserId) {
+      throw new Error('تعذر إنشاء حساب المدير. تأكد من إعدادات Supabase Auth');
+    }
+
+    const { error: upsertError } = await supabase
+      .from(TABLES.ADMIN_PROFILES)
+      .upsert(
+        {
+          id: newUserId,
+          email: normalizedEmail,
+          role,
+          is_active: true,
+        },
+        { onConflict: 'id' }
+      );
+    if (upsertError) throw upsertError;
+
+    return { id: newUserId, email: normalizedEmail, role, is_active: true };
   } catch (err) {
     logAdminError('createAdmin', err);
-    throw new Error(getPbErrorMessage(err, 'فشل إضافة المدير'));
+    throw new Error(getSupabaseErrorMessage(err, 'فشل إضافة المدير'));
   }
 };
 
 export const deleteAdmin = async (id) => {
   try {
-    return await pb.collection('admin_users').delete(id, { $autoCancel: false });
+    const { error: rpcError } = await supabase.rpc('delete_admin_user', { p_admin_id: id });
+    if (!rpcError) return true;
+    logAdminError('deleteAdminRpcFallback', rpcError);
+
+    const { error } = await supabase
+      .from(TABLES.ADMIN_PROFILES)
+      .update({ is_active: false })
+      .eq('id', id);
+    if (error) throw error;
+    return true;
   } catch (err) {
     logAdminError('deleteAdmin', err);
-    throw new Error(getPbErrorMessage(err, 'فشل حذف المدير'));
+    throw new Error(getSupabaseErrorMessage(err, 'فشل حذف المدير'));
   }
 };
 
 export const updateOwnAccount = async ({ id, email, oldPassword, newPassword }) => {
+  if (newPassword) {
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (userError) {
+      logAdminError('updateOwnAccountGetUser', userError);
+      throw new Error(getSupabaseErrorMessage(userError, 'فشل التحقق من الحساب الحالي'));
+    }
+    const currentEmail = userData?.user?.email;
+    if (!currentEmail) {
+      throw new Error('لا يمكن تغيير كلمة المرور بدون بريد إلكتروني صالح');
+    }
+
+    const { error: verifyError } = await supabase.auth.signInWithPassword({
+      email: currentEmail,
+      password: oldPassword,
+    });
+    if (verifyError) {
+      logAdminError('updateOwnAccountVerifyPassword', verifyError);
+      throw new Error('كلمة المرور الحالية غير صحيحة');
+    }
+  }
+
   const patch = {};
   if (email) patch.email = email;
-  if (newPassword) {
-    patch.password = newPassword;
-    patch.passwordConfirm = newPassword;
-    patch.oldPassword = oldPassword;
+  if (newPassword) patch.password = newPassword;
+
+  const { data, error } = await supabase.auth.updateUser(patch);
+  if (error) {
+    logAdminError('updateOwnAccount', error);
+    throw new Error(getSupabaseErrorMessage(error, 'فشل تحديث الحساب'));
   }
-  try {
-    const updated = await pb.collection('admin_users').update(id, patch, { $autoCancel: false });
-    if (pb.authStore.model?.id === id) {
-      pb.authStore.save(pb.authStore.token, { ...pb.authStore.model, ...updated });
+
+  if (email) {
+    const { error: profileError } = await supabase
+      .from(TABLES.ADMIN_PROFILES)
+      .update({ email })
+      .eq('id', id);
+    if (profileError) {
+      logAdminError('updateOwnAccountProfileSync', profileError);
+      throw new Error(getSupabaseErrorMessage(profileError, 'فشل مزامنة البريد الإلكتروني'));
     }
-    return updated;
-  } catch (err) {
-    logAdminError('updateOwnAccount', err);
-    throw new Error(getPbErrorMessage(err, 'فشل تحديث الحساب'));
   }
+
+  return data?.user || null;
 };

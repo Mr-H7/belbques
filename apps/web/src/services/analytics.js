@@ -1,27 +1,28 @@
+import supabase from '@/services/supabase';
 
-import pb from '@/utils/pocketbase';
+const generateAnalyticsPayload = async (eventType, eventData) => {
+  const { data } = await supabase.auth.getUser();
+  const userId = data?.user?.id || null;
 
-const generateAnalyticsPayload = (eventType, eventData) => {
   return {
-    eventType,
-    userId: pb.authStore.isValid ? pb.authStore.model.id : 'anonymous',
-    eventData,
-    pageUrl: window.location.href
-    // Note: timestamp field is an autodate field in PocketBase, 
-    // so it will be automatically populated on creation.
+    event_type: eventType,
+    user_id: userId,
+    event_data: eventData,
+    page_url: window.location.href,
   };
 };
 
 export const trackEvent = async (eventType, eventData = {}) => {
   try {
-    const payload = generateAnalyticsPayload(eventType, {
+    const payload = await generateAnalyticsPayload(eventType, {
       ...eventData,
       userAgent: navigator.userAgent,
-      screenWidth: window.innerWidth
+      screenWidth: window.innerWidth,
     });
-    await pb.collection('analytics_events').create(payload, { $autoCancel: false });
+    await supabase.from('analytics_events').insert(payload);
   } catch (error) {
-    console.warn("Analytics tracking failed:", error);
+    // eslint-disable-next-line no-console
+    console.warn('Analytics tracking failed:', error);
   }
 };
 

@@ -1,7 +1,7 @@
-
 import React, { createContext, useState, useEffect } from 'react';
-import pb from '@/utils/pocketbase';
 import { toast } from 'sonner';
+import supabase from '@/services/supabase';
+import { getCurrentAdminProfile } from '@/services/settings';
 
 export const AuthContext = createContext(null);
 
@@ -10,55 +10,105 @@ export function AuthProvider({ children }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    const checkAuth = () => {
-      if (pb.authStore.isValid && pb.authStore.model?.collectionName === 'admin_users') {
-        setCurrentAdmin(pb.authStore.model);
-        setIsAuthenticated(true);
-      } else {
+  const syncFromSession = async (session) => {
+    if (!session?.user?.id) {
+      setCurrentAdmin(null);
+      setIsAuthenticated(false);
+      return;
+    }
+
+    try {
+      const profile = await getCurrentAdminProfile(session.user.id);
+      if (!profile || profile.role !== 'admin') {
         setCurrentAdmin(null);
         setIsAuthenticated(false);
+        return;
       }
-      setIsLoading(false);
+
+      setCurrentAdmin({
+        ...profile,
+        email: profile.email || session.user.email || '',
+      });
+      setIsAuthenticated(true);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('Auth profile sync failed:', err);
+      setCurrentAdmin(null);
+      setIsAuthenticated(false);
+    }
+  };
+
+  useEffect(() => {
+    let mounted = true;
+
+    const init = async () => {
+      try {
+        const { data, error } = await supabase.auth.getSession();
+        if (error) throw error;
+        if (mounted) await syncFromSession(data?.session || null);
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error('Auth init failed:', err);
+        if (mounted) {
+          setCurrentAdmin(null);
+          setIsAuthenticated(false);
+        }
+      } finally {
+        if (mounted) setIsLoading(false);
+      }
     };
 
-    checkAuth();
+    init();
 
-    const unsubscribe = pb.authStore.onChange((token, model) => {
-      if (token && model?.collectionName === 'admin_users') {
-        setCurrentAdmin(model);
-        setIsAuthenticated(true);
-      } else {
-        setCurrentAdmin(null);
-        setIsAuthenticated(false);
-      }
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      syncFromSession(session).finally(() => setIsLoading(false));
     });
 
-    return () => unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const login = async (email, password) => {
     try {
-      const authData = await pb.collection('admin_users').authWithPassword(email, password, { $autoCancel: false });
-      setCurrentAdmin(authData.record);
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+
+      const profile = await getCurrentAdminProfile(data?.user?.id);
+      if (!profile || profile.role !== 'admin') {
+        await supabase.auth.signOut();
+        throw new Error('هذا الحساب لا يملك صلاحية المدير');
+      }
+
+      setCurrentAdmin({
+        ...profile,
+        email: profile.email || data.user?.email || email,
+      });
       setIsAuthenticated(true);
       toast.success('تم تسجيل الدخول بنجاح');
       return true;
     } catch (error) {
-      console.error("Login failed", error);
-      toast.error('فشل تسجيل الدخول. تأكد من البريد الإلكتروني وكلمة المرور.');
+      // eslint-disable-next-line no-console
+      console.error('Login failed', error);
+      toast.error(error?.message || 'فشل تسجيل الدخول. تأكد من البريد الإلكتروني وكلمة المرور.');
       throw error;
     }
   };
 
-  const logout = () => {
-    pb.authStore.clear();
+  const logout = async () => {
+    await supabase.auth.signOut();
     setCurrentAdmin(null);
     setIsAuthenticated(false);
     toast.info('تم تسجيل الخروج');
   };
 
-  const getAuthToken = () => pb.authStore.token;
+  const getAuthToken = async () => {
+    const { data } = await supabase.auth.getSession();
+    return data?.session?.access_token || '';
+  };
 
   const value = {
     currentAdmin,
@@ -66,7 +116,7 @@ export function AuthProvider({ children }) {
     isLoading,
     login,
     logout,
-    getAuthToken
+    getAuthToken,
   };
 
   return (
