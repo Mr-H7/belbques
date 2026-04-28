@@ -49,14 +49,9 @@ const extractSearchTerm = (filters = '') => {
 export const submitSurvey = async (submission) => {
   const payload = buildPayload(submission);
   try {
-    const { data, error } = await supabase
-      .from(SURVEYS_TABLE)
-      .insert(payload)
-      .select('*')
-      .single();
-
+    const { error } = await supabase.from(SURVEYS_TABLE).insert(payload);
     if (error) throw error;
-    return { ok: true, record: adaptSurveyRow(data), queued: false };
+    return { ok: true, record: null, queued: false };
   } catch (error) {
     if (isSupabaseUnavailable(error)) {
       const queued = queueLocally(payload);
