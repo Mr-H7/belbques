@@ -6,73 +6,63 @@
 
 @layer base {
   :root {
-    /* Deep Navy Base: #1a2a4a */
-    --background: 220 48% 20%;
-    --foreground: 42 33% 94%;
-    
-    --card: 220 48% 24%;
-    --card-foreground: 42 33% 94%;
-    
-    --popover: 220 48% 24%;
-    --popover-foreground: 42 33% 94%;
-    
-    --primary: 210 50% 55%;
-    --primary-foreground: 0 0% 100%;
-    
-    --secondary: 42 33% 94%;
-    --secondary-foreground: 220 48% 20%;
-    
-    --muted: 220 48% 30%;
-    --muted-foreground: 42 33% 80%;
-    
-    --accent: 210 50% 55%;
-    --accent-foreground: 0 0% 100%;
-    
+    --background: 218 44% 13%;
+    --foreground: 214 36% 96%;
+
+    --card: 218 42% 17%;
+    --card-foreground: 214 36% 96%;
+
+    --popover: 218 42% 17%;
+    --popover-foreground: 214 36% 96%;
+
+    --primary: 201 91% 58%;
+    --primary-foreground: 216 43% 13%;
+
+    --secondary: 214 30% 91%;
+    --secondary-foreground: 218 42% 17%;
+
+    --muted: 217 31% 24%;
+    --muted-foreground: 214 20% 79%;
+
+    --accent: 210 83% 60%;
+    --accent-foreground: 214 36% 96%;
+
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
-    
-    --border: 220 48% 30%;
-    --input: 220 48% 30%;
-    --ring: 210 50% 55%;
-    
+
+    --border: 216 27% 27%;
+    --input: 216 27% 27%;
+    --ring: 201 91% 58%;
+
     --radius: 1rem;
   }
 
   .dark {
-    /* Admin Dark Theme */
     --background: 220 40% 8%;
-    --foreground: 42 33% 94%;
-    
-    --card: 220 40% 12%;
-    --card-foreground: 42 33% 94%;
-    
-    --popover: 220 40% 12%;
-    --popover-foreground: 42 33% 94%;
-    
-    --primary: 210 60% 60%;
-    --primary-foreground: 0 0% 100%;
-    
-    --secondary: 220 30% 20%;
-    --secondary-foreground: 42 33% 94%;
-    
-    --muted: 220 30% 15%;
-    --muted-foreground: 220 20% 70%;
-    
-    --accent: 220 40% 20%;
-    --accent-foreground: 42 33% 94%;
-    
+    --foreground: 214 35% 95%;
+    --card: 220 38% 12%;
+    --card-foreground: 214 35% 95%;
+    --popover: 220 38% 12%;
+    --popover-foreground: 214 35% 95%;
+    --primary: 201 91% 58%;
+    --primary-foreground: 216 43% 13%;
+    --secondary: 220 27% 20%;
+    --secondary-foreground: 214 35% 95%;
+    --muted: 220 26% 15%;
+    --muted-foreground: 220 14% 74%;
+    --accent: 219 37% 22%;
+    --accent-foreground: 214 35% 95%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
-    
-    --border: 220 30% 20%;
-    --input: 220 30% 20%;
-    --ring: 210 60% 60%;
+    --border: 220 21% 23%;
+    --input: 220 21% 23%;
+    --ring: 201 91% 58%;
   }
 
   * {
     @apply border-border;
   }
-  
+
   html {
     scroll-behavior: smooth;
   }
@@ -83,86 +73,177 @@
     line-height: 1.7;
     direction: rtl;
     overflow-x: hidden;
+    background-image:
+      radial-gradient(1200px 700px at 85% -10%, rgba(45, 155, 255, 0.18), transparent 60%),
+      radial-gradient(850px 520px at 8% 20%, rgba(56, 189, 248, 0.11), transparent 65%),
+      linear-gradient(180deg, #0f203f 0%, #121f35 45%, #101a2d 100%);
+    background-attachment: fixed;
   }
 
-  h1, h2, h3, h4, h5, h6 {
-    line-height: 1.3;
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    line-height: 1.2;
     text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
   }
 }
 
 @layer utilities {
   .glass-card {
-    background: rgba(255, 255, 255, 0.05);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.03));
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid rgba(199, 226, 255, 0.16);
+  }
+
+  .glass-header {
+    background: linear-gradient(180deg, rgba(11, 22, 45, 0.9), rgba(11, 22, 45, 0.72));
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border-bottom: 1px solid rgba(174, 214, 255, 0.16);
   }
 
   .admin-sidebar {
-    background: rgba(15, 23, 42, 0.95);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border-left: 1px solid rgba(255, 255, 255, 0.05);
+    background: rgba(8, 15, 30, 0.92);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border-left: 1px solid rgba(190, 225, 255, 0.09);
   }
 
   .admin-main {
     @apply bg-background min-h-screen;
   }
 
-  .glass-header {
-    background: rgba(26, 42, 74, 0.85);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  .premium-shadow {
+    box-shadow:
+      0 20px 45px -24px rgba(9, 18, 40, 0.92),
+      0 10px 22px -15px rgba(26, 111, 191, 0.38);
   }
 
-  .premium-shadow {
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2), 0 2px 8px rgba(0, 0, 0, 0.15);
+  .premium-shadow-lg {
+    box-shadow:
+      0 34px 70px -30px rgba(8, 16, 36, 0.95),
+      0 14px 34px -18px rgba(29, 140, 242, 0.42);
   }
 
   .text-glow {
-    text-shadow: 0 0 20px rgba(96, 165, 250, 0.4);
+    text-shadow: 0 0 26px rgba(87, 191, 255, 0.22);
+  }
+
+  .section-divider {
+    height: 1px;
+    width: min(1300px, calc(100% - 2rem));
+    margin-inline: auto;
+    background: linear-gradient(90deg, transparent, rgba(147, 197, 253, 0.6), transparent);
+  }
+
+  .admin-cta {
+    background: linear-gradient(135deg, rgba(21, 60, 112, 0.82), rgba(29, 141, 231, 0.82));
+    color: #f1f8ff;
+    border: 1px solid rgba(147, 197, 253, 0.36);
+  }
+
+  .logo-mark {
+    filter: drop-shadow(0 10px 22px rgba(28, 164, 255, 0.35));
   }
 }
 
 @keyframes float {
-  0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-12px); }
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
 }
 
 @keyframes breathe {
-  0%, 100% { transform: scale(1); opacity: 1; }
-  50% { transform: scale(1.03); opacity: 0.9; }
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.03);
+    opacity: 0.92;
+  }
 }
 
 @keyframes glow {
-  0%, 100% { box-shadow: 0 0 20px rgba(96, 165, 250, 0.2), 0 0 40px rgba(96, 165, 250, 0.1); }
-  50% { box-shadow: 0 0 30px rgba(96, 165, 250, 0.4), 0 0 60px rgba(96, 165, 250, 0.2); }
+  0%,
+  100% {
+    box-shadow: 0 0 0 rgba(56, 189, 248, 0.1), 0 0 22px rgba(56, 189, 248, 0.15);
+  }
+  50% {
+    box-shadow: 0 0 0 rgba(56, 189, 248, 0.22), 0 0 34px rgba(56, 189, 248, 0.32);
+  }
 }
 
 @keyframes parallax-slow {
-  0% { transform: translateY(0px) translateX(0px); }
-  100% { transform: translateY(-20px) translateX(10px); }
+  0% {
+    transform: translateY(0px) translateX(0px);
+  }
+  100% {
+    transform: translateY(-22px) translateX(10px);
+  }
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-.animate-float { animation: float 6s ease-in-out infinite; }
-.animate-breathe { animation: breathe 4s ease-in-out infinite; }
-.animate-glow { animation: glow 3s ease-in-out infinite; }
-.animate-parallax { animation: parallax-slow 20s ease-in-out infinite alternate; }
-.animate-fade-in { animation: fadeIn 0.8s ease-out forwards; }
-
-* {
-  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter;
-  transition-timing-function: ease;
-  transition-duration: 0.3s;
+.animate-float {
+  animation: float 6s ease-in-out infinite;
 }
 
-button, a, input, textarea, select {
+.animate-breathe {
+  animation: breathe 4s ease-in-out infinite;
+}
+
+.animate-glow {
+  animation: glow 3.2s ease-in-out infinite;
+}
+
+.animate-parallax {
+  animation: parallax-slow 20s ease-in-out infinite alternate;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.8s ease-out forwards;
+}
+
+button,
+a,
+input,
+textarea,
+select {
+  transition-property: color, background-color, border-color, opacity, box-shadow, transform, filter;
   transition-duration: 0.2s;
+  transition-timing-function: ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+    scroll-behavior: auto !important;
+  }
 }

@@ -7,8 +7,8 @@ export function QuestionButton({ children, selected, onClick }) {
       onClick={onClick}
       className={`group w-full px-5 py-4 sm:py-[18px] rounded-2xl text-right font-semibold text-base sm:text-lg transition-all duration-200 border-2 flex items-center justify-between gap-4 ${
         selected
-          ? 'bg-primary text-primary-foreground border-primary shadow-[0_10px_30px_-10px_rgba(96,165,250,0.5)] scale-[1.01]'
-          : 'bg-card/40 text-card-foreground border-white/5 hover:bg-card hover:border-primary/40 hover:-translate-y-0.5 hover:shadow-md'
+          ? 'bg-primary/15 text-foreground border-primary shadow-[0_14px_34px_-14px_rgba(56,189,248,0.55)] scale-[1.01]'
+          : 'bg-[#0f213f]/65 text-card-foreground border-white/10 hover:bg-[#132a4d] hover:border-primary/35 hover:-translate-y-0.5 hover:shadow-md'
       } active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background`}
       aria-pressed={selected}
     >

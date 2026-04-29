@@ -27,8 +27,8 @@ function MultiOption({ selected, onClick, children }) {
       onClick={onClick}
       className={`group w-full px-5 py-4 sm:py-[18px] rounded-2xl text-right font-semibold text-base sm:text-lg transition-all duration-200 border-2 flex items-center justify-between gap-4 ${
         selected
-          ? 'bg-primary/15 text-foreground border-primary shadow-[0_8px_24px_-12px_rgba(96,165,250,0.4)]'
-          : 'bg-card/40 text-card-foreground border-white/5 hover:bg-card hover:border-primary/40 hover:-translate-y-0.5'
+          ? 'bg-primary/15 text-foreground border-primary shadow-[0_14px_34px_-14px_rgba(56,189,248,0.55)]'
+          : 'bg-[#0f213f]/65 text-card-foreground border-white/10 hover:bg-[#132a4d] hover:border-primary/35 hover:-translate-y-0.5'
       } active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background`}
       aria-pressed={selected}
     >
@@ -90,7 +90,6 @@ function QuestionView({ question, index }) {
     );
   }
 
-  // text
   return (
     <div onFocus={() => trackInputFocus(`question_${question.id}`)}>
       <SurveyInput
@@ -124,7 +123,7 @@ function ReviewStep() {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-xl bg-card/30 border border-border/40 p-5">
+      <div className="rounded-xl bg-[#0f213f]/62 border border-white/12 p-5">
         <div className="flex items-center justify-between mb-4">
           <h4 className="text-lg font-bold">بيانات التواصل</h4>
           <button
@@ -145,7 +144,7 @@ function ReviewStep() {
 
       <div className="space-y-3">
         {questions.map((q, i) => (
-          <div key={q.id} className="rounded-xl bg-card/30 border border-border/40 p-4">
+          <div key={q.id} className="rounded-xl bg-[#0f213f]/62 border border-white/12 p-4">
             <div className="flex items-start justify-between gap-3 mb-2">
               <h5 className="font-semibold text-foreground/90">
                 {i + 1}. {q.text}
@@ -204,10 +203,10 @@ export function SurveySection() {
   let subtitle = '';
   if (isReporter) {
     title = 'قبل ما نبدأ… عرّفنا بنفسك';
-    subtitle = 'بياناتك سرّية — هنستخدمها بس عشان نفهم آراء أهل بنها.';
+    subtitle = 'بياناتك سرّية — بنستخدمها فقط لفهم آراء أهل بنها.';
   } else if (isReview) {
     title = 'راجع إجاباتك قبل الإرسال';
-    subtitle = 'لو حابب تعدّل أي حاجة، اضغط "تعديل" جنب السؤال.';
+    subtitle = 'لو حابب تعدّل أي إجابة، استخدم زر "تعديل".';
   } else if (currentQuestion) {
     title = currentQuestion.text;
     subtitle = currentQuestion.required ? '' : 'اختياري';
